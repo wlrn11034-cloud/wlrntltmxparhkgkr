@@ -659,7 +659,10 @@ body,button,input,textarea,select{
     if(!window.supabase){setStatus('Realtime 연결 실패 · 라이브러리 오류'); console.error('Supabase library missing'); scheduleRetry(); return;}
     connecting=true; setStatus('서버 연결 중…');
     try{
-      if(!sb) sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+      if(!sb) sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+        auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+        realtime:{params:{log_level:'info'}}
+      });
       ch=sb.channel(ROOM,{config:{presence:{key:clientId},broadcast:{self:false,ack:true}}});
       ch.on('presence',{event:'sync'},refreshPresence)
         .on('presence',{event:'join'},refreshPresence)
@@ -670,14 +673,26 @@ body,button,input,textarea,select{
         .on('broadcast',{event:'battle_start'},({payload})=>onBattleStart(payload))
         .on('broadcast',{event:'battle_state'},({payload})=>onBattleState(payload))
         .on('broadcast',{event:'battle_end'},({payload})=>onBattleEnd(payload));
-      ch.subscribe(async status=>{
-        console.log('Realtime status:',status);
+      ch.subscribe(async (status,err)=>{
+        console.log('Realtime status:',status,'error:',err);
         if(status==='SUBSCRIBED'){
           connecting=false; joined=true; setStatus('Realtime 연결됨 · 온라인 1명');
           try{await ch.track({clientId,name:state.name,x:state.pos.x,y:state.pos.y,online_at:new Date().toISOString()});}catch(e){console.error('track',e);}
           refreshPresence(); send('move',{name:state.name,x:state.pos.x,y:state.pos.y});
         }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-          joined=false; connecting=false; setStatus('Realtime 연결 실패 · '+status); scheduleRetry();
+          joined=false; connecting=false;
+          let detail='';
+          try{
+            if(err){
+              detail = err.message || err.error || err.reason || err.code || '';
+              if(!detail && typeof err==='object') detail=JSON.stringify(err);
+              if(!detail) detail=String(err);
+            }
+          }catch(_){}
+          const msg='Realtime 연결 실패 · '+status+(detail?' · '+detail:' · 상세오류 없음');
+          setStatus(msg);
+          console.error('Realtime subscribe failure:',status,err);
+          scheduleRetry();
         }
       });
     }catch(e){console.error('Realtime connect error',e);connecting=false;joined=false;setStatus('Realtime 연결 실패');scheduleRetry();}
