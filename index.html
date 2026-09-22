@@ -76,7 +76,7 @@ function encounter(){
   if(!candidates.length){ toast('이 지역의 광물몬은 충분히 만났어요. 다른 지역을 탐험해 보세요!'); return; }
   let id=candidates[Math.floor(Math.random()*candidates.length)];
   if(state.owned.has(id)) seenAfterCatch[id]=(seenAfterCatch[id]||0)+1;
-  state.wild=byId[id];state.qStage=1;showQuestion('name')
+  state.wild=byId[id];state.wildWasOwned=state.owned.has(id);state.qStage=1;showQuestion('name')
 }
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function open(html){panel.innerHTML=html;overlay.classList.remove('hidden')};function close(){overlay.classList.add('hidden');panel.innerHTML=''}
@@ -84,8 +84,8 @@ function opts(correct,all){let arr=shuffle([correct,...shuffle(all.filter(x=>x!=
 function showQuestion(type){let w=state.wild,q,correct,all;if(type==='name'){q='이 캐릭터가 나타내는 광물은 무엇일까?';correct=w.mineral;all=[...new Set(C.map(x=>x.mineral))]}else{let types=['structure','elements','cleavage'];type=types[Math.floor(Math.random()*types.length)];if(type==='structure'){q=`${w.mineral}의 규산염 구조는?`;correct=w.structure;all=['독립형 구조','단사슬 구조','복사슬 구조','판상 구조','망상 구조']}if(type==='elements'){q=`${w.mineral}의 주요 원소로 가장 적절한 것은?`;correct=w.elements;all=['K','Si','Mg·Fe','Mg·Fe·Ca','Ca·Mg·Fe','K·Mg·Fe']}if(type==='cleavage'){q=`${w.mineral}의 쪼개짐·깨짐 특징은?`;correct=w.cleavage;all=['1방향 쪼개짐','2방향 쪼개짐','쪼개짐 없음. 깨짐','쪼개짐보다 깨짐이 뚜렷']}}
 open(`<div class="encounter"><img class="wildimg" src="${w.img}"><div><div class="speech">⚠️ 야생의 광물이 나타났다!</div><h2>${q}</h2><div class="choices">${opts(correct,all)}</div><div class="small" style="margin-top:10px">두 문제를 모두 맞히면 전투 없이 포획할 수 있어요.</div></div></div>`);panel.querySelectorAll('.choice').forEach(b=>b.onclick=()=>answer(b,b.dataset.v===correct,type))}
 function answer(btn,ok,type){panel.querySelectorAll('.choice').forEach(x=>x.disabled=true);btn.classList.add(ok?'correct':'wrong');if(ok){state.correct++;setTimeout(()=>{if(type==='name')showQuestion('trait');else capture(true)},550)}else{state.wrong++;setTimeout(()=>startBattle(),650)}}
-function capture(quizWin){let w=state.wild,already=state.owned.has(w.id);if(already){let lead=state.party[0];state.hp[lead]=Math.min(byId[lead].hp,state.hp[lead]+1);open(`<div style="text-align:center"><img class="startchar" src="${w.img}"><h2>이미 만난 ${w.name}!</h2><p>문제를 해결한 보상으로 <b>${byId[lead].name} HP +1</b></p><button class="bigbtn" id="cont">탐험 계속</button></div>`);$('#cont').onclick=()=>{close();updateHUD()};return}
-state.owned.add(w.id);if(state.party.length<3){state.party.push(w.id);state.hp[w.id]=w.hp}updateHUD();open(`<div style="text-align:center"><div class="speech">🔴 광물볼을 던졌다! · · · ✨</div><img class="startchar" src="${w.img}"><h2>신난다! No.${w.id} ${w.name} 포획 성공!</h2><p>실제 광물: <b>${w.mineral}</b><br>광물도감에 등록되었습니다. (${state.owned.size}/12)</p>${state.party.length>=3?'<p class="small">파티가 가득 찼어요. 광물센터/파티 메뉴에서 교체할 수 있어요.</p>':''}<button class="bigbtn" id="cont">탐험 계속</button></div>`);$('#cont').onclick=()=>{close();if(state.owned.size===12)toast('도감 완성! 광물센터로 돌아가 박사에게 말을 걸어 보세요.')}}
+function capture(quizWin){let w=state.wild,already=state.wildWasOwned===true;if(already){let lead=state.party[0];state.hp[lead]=Math.min(byId[lead].hp,state.hp[lead]+1);open(`<div style="text-align:center"><img class="startchar" src="${w.img}"><h2>이미 만난 ${w.name}!</h2><p>문제를 해결한 보상으로 <b>${byId[lead].name} HP +1</b></p><button class="bigbtn" id="cont">탐험 계속</button></div>`);$('#cont').onclick=()=>{close();updateHUD()};return}
+state.owned.add(w.id);state.wildWasOwned=true;if(state.party.length<3){state.party.push(w.id);state.hp[w.id]=w.hp}updateHUD();open(`<div style="text-align:center"><div class="speech">🔴 광물볼을 던졌다! · · · ✨</div><img class="startchar" src="${w.img}"><h2>신난다! No.${w.id} ${w.name} 포획 성공!</h2><p>실제 광물: <b>${w.mineral}</b><br>광물도감에 등록되었습니다. (${state.owned.size}/12)</p>${state.party.length>=3?'<p class="small">파티가 가득 찼어요. 광물센터/파티 메뉴에서 교체할 수 있어요.</p>':''}<button class="bigbtn" id="cont">탐험 계속</button></div>`);$('#cont').onclick=()=>{close();if(state.owned.size===12)toast('도감 완성! 광물센터로 돌아가 박사에게 말을 걸어 보세요.')}}
 function startBattle(){let w=state.wild;state.battle={wildHp:w.hp,active:state.party.find(id=>state.hp[id]>0)||state.party[0],busy:false};renderBattle(`❌ 오답! ${w.name}가 화났다! 전투 시작!`)}
 function renderBattle(msg){let b=state.battle,w=state.wild,a=byId[b.active];open(`<div><div class="speech">⚔️ 광물몬 전투!</div><div class="battlefield"><div class="fighter"><div class="statusrow"><span>${a.name}</span><span>HP ${state.hp[a.id]}/${a.hp}</span></div><div class="hpbar"><div class="hpfill" style="width:${100*state.hp[a.id]/a.hp}%"></div></div><img src="${a.img}"></div><div class="fighter"><div class="statusrow"><span>야생의 ${w.name}</span><span>HP ${b.wildHp}/${w.hp}</span></div><div class="hpbar"><div class="hpfill" style="width:${100*b.wildHp/w.hp}%"></div></div><img src="${w.img}"></div></div><div class="log">${msg}</div><div class="battleactions"><button class="battlebtn" data-act="m1">💎 ${a.move1}<br><small>100% · 피해 1</small></button><button class="battlebtn" data-act="m2">💥 ${a.move2}<br><small>70% · 피해 1~3</small></button><button class="battlebtn" data-act="swap">🔄 광물 교체</button><button class="battlebtn" data-act="run">🏃 도망가기</button></div></div>`);panel.querySelectorAll('[data-act]').forEach(x=>x.onclick=()=>battleAction(x.dataset.act))}
 function battleAction(act){let b=state.battle;if(b.busy)return;let a=byId[b.active],w=state.wild;if(act==='run'){close();toast('야생의 광물에게서 도망쳤다!');return}if(act==='swap'){showSwap();return}let hit=act==='m1'||Math.random()<.7, dmg=act==='m1'?1:1+Math.floor(Math.random()*3);let msg=hit?`${a.name}의 ${act==='m1'?a.move1:a.move2}! 야생의 ${w.name}에게 ${dmg} 피해!`:`${a.name}의 공격이 빗나갔다!`;if(hit)b.wildHp=Math.max(0,b.wildHp-dmg);if(b.wildHp<=0){state.wins++;renderBattle(msg+' 야생의 광물이 지쳤다!');setTimeout(()=>capture(false),650);return}let wdmg=Math.random()<.72?1:(1+Math.floor(Math.random()*2));state.hp[a.id]=Math.max(0,state.hp[a.id]-wdmg);msg+=`<br>야생의 ${w.name}가 반격! ${a.name}에게 ${wdmg} 피해!`;if(state.hp[a.id]<=0){let next=state.party.find(id=>state.hp[id]>0);if(!next){state.returns++;close();state.pos={x:50,y:67};healAll();placePlayer();toast('파티가 모두 쓰러져 광물센터로 귀환! HP 완전 회복.');return}else{b.active=next;msg+=`<br>${a.name}가 쓰러졌다! ${byId[next].name} 출전!`}}renderBattle(msg);updateHUD()}
@@ -321,7 +321,7 @@ h1,h2,.speech,.bigbtn,.choice,.battlebtn,.pill,.close{letter-spacing:.04em}
 
   // Pixel mineral-ball capture animation.
   capture=function(quizWin){
-    let w=state.wild,already=state.owned.has(w.id);
+    let w=state.wild,already=state.wildWasOwned===true;
     if(already){
       let lead=state.party[0];
       state.hp[lead]=Math.min(byId[lead].hp,state.hp[lead]+1);
@@ -329,6 +329,7 @@ h1,h2,.speech,.bigbtn,.choice,.battlebtn,.pill,.close{letter-spacing:.04em}
       document.getElementById('cont').onclick=()=>{close();updateHUD()}; return;
     }
     state.owned.add(w.id);
+    state.wildWasOwned=true;
     if(state.party.length<3){state.party.push(w.id);state.hp[w.id]=w.hp}
     updateHUD();
     open(`<div style="text-align:center">
@@ -635,31 +636,57 @@ body,button,input,textarea,select{
   const SUPABASE_URL='https://ntrneymnvfrpjpgnlvka.supabase.co';
   const SUPABASE_KEY='sb_publishable_VTH_E5vQvtaBcPQ_nY9Pzw_lMUo4_uD';
   const ROOM='mineralmon-classroom-v1';
-  const clientId=sessionStorage.getItem('mineralmon_client_id') || (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
+  const clientId=sessionStorage.getItem('mineralmon_client_id') || ((window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+Math.random());
   sessionStorage.setItem('mineralmon_client_id',clientId);
-  let sb=null,ch=null,joined=false,lastMove=0,pvp=null;
+  let sb=null,ch=null,joined=false,connecting=false,lastMove=0,pvp=null,retryTimer=null;
   const remotes=new Map();
   const game=document.getElementById('game');
-  const pill=document.createElement('div');pill.id='onlinePill';pill.textContent='온라인 1명';game.appendChild(pill);
+  const pill=document.createElement('div'); pill.id='onlinePill'; pill.textContent='서버 연결 대기'; game.appendChild(pill);
+  function setStatus(t){pill.textContent=t;}
   function safe(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
   function partySnapshot(){return state.party.slice(0,3).map(id=>({id,hp:byId[id].hp}));}
-  function send(event,payload){if(ch)ch.send({type:'broadcast',event,payload:Object.assign({from:clientId},payload||{})});}
+  async function send(event,payload){if(!ch||!joined)return;try{await ch.send({type:'broadcast',event,payload:Object.assign({from:clientId},payload||{})});}catch(e){console.error('broadcast',e);}}
   function remoteEl(id){let e=remotes.get(id)?.el;if(e)return e;e=document.createElement('div');e.className='remote-player';e.dataset.id=id;e.innerHTML='<span class="rp-name"></span><span class="rp-head"></span><span class="rp-body"></span><span class="rp-leg"></span>';game.appendChild(e);e.addEventListener('pointerdown',ev=>{ev.stopPropagation();requestBattle(id)});remotes.set(id,{el:e,x:50,y:67,name:'트레이너'});return e;}
-  function drawRemote(id,data){if(id===clientId)return;let r=remotes.get(id)||{};Object.assign(r,data||{});let e=remoteEl(id);r.el=e;remotes.set(id,r);e.style.left=(r.x??50)+'%';e.style.top=(r.y??67)+'%';e.querySelector('.rp-name').textContent=r.name||'트레이너';const d=Math.hypot((r.x??50)-state.pos.x,(r.y??67)-state.pos.y);e.classList.toggle('near',d<12);}
+  function drawRemote(id,data){if(!id||id===clientId)return;let r=remotes.get(id)||{};Object.assign(r,data||{});let e=remoteEl(id);r.el=e;remotes.set(id,r);e.style.left=(r.x??50)+'%';e.style.top=(r.y??67)+'%';e.querySelector('.rp-name').textContent=r.name||'트레이너';const d=Math.hypot((r.x??50)-state.pos.x,(r.y??67)-state.pos.y);e.classList.toggle('near',d<12);}
   function removeRemote(id){let r=remotes.get(id);if(r?.el)r.el.remove();remotes.delete(id);}
-  function refreshPresence(){if(!ch)return;const ps=ch.presenceState();const live=new Set();Object.values(ps).flat().forEach(x=>{if(x.clientId&&x.clientId!==clientId){live.add(x.clientId);drawRemote(x.clientId,{name:x.name,x:x.x,y:x.y});}});[...remotes.keys()].forEach(id=>{if(!live.has(id))removeRemote(id)});pill.textContent='온라인 '+(live.size+1)+'명';}
-  async function connect(){if(joined||!state.name)return; if(!window.supabase){toast('실시간 서버 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');return;}joined=true;sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});ch=sb.channel(ROOM,{config:{presence:{key:clientId},broadcast:{self:false}}});
-    ch.on('presence',{event:'sync'},refreshPresence).on('presence',{event:'leave'},refreshPresence)
-      .on('broadcast',{event:'move'},({payload})=>drawRemote(payload.from,payload))
-      .on('broadcast',{event:'battle_request'},({payload})=>onRequest(payload))
-      .on('broadcast',{event:'battle_decline'},({payload})=>onDecline(payload))
-      .on('broadcast',{event:'battle_start'},({payload})=>onBattleStart(payload))
-      .on('broadcast',{event:'battle_state'},({payload})=>onBattleState(payload))
-      .on('broadcast',{event:'battle_end'},({payload})=>onBattleEnd(payload));
-    ch.subscribe(async status=>{if(status==='SUBSCRIBED'){await ch.track({clientId,name:state.name,x:state.pos.x,y:state.pos.y});refreshPresence();send('move',{name:state.name,x:state.pos.x,y:state.pos.y});toast('실시간 교실에 접속했습니다!');}});
+  function refreshPresence(){if(!ch||!joined)return;const ps=ch.presenceState()||{};const live=new Set();Object.values(ps).flat().forEach(x=>{if(x&&x.clientId&&x.clientId!==clientId){live.add(x.clientId);drawRemote(x.clientId,{name:x.name,x:x.x,y:x.y});}});[...remotes.keys()].forEach(id=>{if(!live.has(id))removeRemote(id)});setStatus('Realtime 연결됨 · 온라인 '+(live.size+1)+'명');}
+  function cleanupChannel(){try{if(ch){ch.untrack();sb?.removeChannel(ch);}}catch(e){} ch=null;joined=false;connecting=false;}
+  function scheduleRetry(){clearTimeout(retryTimer);retryTimer=setTimeout(()=>{if(state.name)connect(true)},2500);}
+  async function connect(force=false){
+    if(!state.name)return;
+    if((joined||connecting)&&!force)return;
+    if(force)cleanupChannel();
+    if(!window.supabase){setStatus('Realtime 연결 실패 · 라이브러리 오류'); console.error('Supabase library missing'); scheduleRetry(); return;}
+    connecting=true; setStatus('서버 연결 중…');
+    try{
+      if(!sb) sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+      ch=sb.channel(ROOM,{config:{presence:{key:clientId},broadcast:{self:false,ack:true}}});
+      ch.on('presence',{event:'sync'},refreshPresence)
+        .on('presence',{event:'join'},refreshPresence)
+        .on('presence',{event:'leave'},refreshPresence)
+        .on('broadcast',{event:'move'},({payload})=>drawRemote(payload.from,payload))
+        .on('broadcast',{event:'battle_request'},({payload})=>onRequest(payload))
+        .on('broadcast',{event:'battle_decline'},({payload})=>onDecline(payload))
+        .on('broadcast',{event:'battle_start'},({payload})=>onBattleStart(payload))
+        .on('broadcast',{event:'battle_state'},({payload})=>onBattleState(payload))
+        .on('broadcast',{event:'battle_end'},({payload})=>onBattleEnd(payload));
+      ch.subscribe(async status=>{
+        console.log('Realtime status:',status);
+        if(status==='SUBSCRIBED'){
+          connecting=false; joined=true; setStatus('Realtime 연결됨 · 온라인 1명');
+          try{await ch.track({clientId,name:state.name,x:state.pos.x,y:state.pos.y,online_at:new Date().toISOString()});}catch(e){console.error('track',e);}
+          refreshPresence(); send('move',{name:state.name,x:state.pos.x,y:state.pos.y});
+        }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+          joined=false; connecting=false; setStatus('Realtime 연결 실패 · '+status); scheduleRetry();
+        }
+      });
+    }catch(e){console.error('Realtime connect error',e);connecting=false;joined=false;setStatus('Realtime 연결 실패');scheduleRetry();}
   }
-  const oldAdventure=document.getElementById('adventureBtn').onclick;document.getElementById('adventureBtn').onclick=function(){oldAdventure();setTimeout(connect,50)};
-  const oldPlace=window.placePlayer;window.placePlayer=function(){oldPlace();const now=Date.now();if(ch&&now-lastMove>220){lastMove=now;send('move',{name:state.name,x:state.pos.x,y:state.pos.y});}remotes.forEach((r,id)=>drawRemote(id,{}));};
+  // Connect from either game-start route, and also self-heal if a handler is replaced later.
+  const adv=document.getElementById('adventureBtn'); const oldAdventure=adv.onclick; adv.onclick=function(){if(oldAdventure)oldAdventure.apply(this,arguments);setTimeout(()=>connect(false),100)};
+  const startBtn=document.getElementById('startBtn'); if(startBtn){const oldStart=startBtn.onclick;startBtn.onclick=function(){if(oldStart)oldStart.apply(this,arguments);setTimeout(()=>{if(state.name&&!document.getElementById('game').classList.contains('hidden'))connect(false)},250)}}
+  setInterval(()=>{if(state.name&&!document.getElementById('game').classList.contains('hidden')&&!joined&&!connecting)connect(false)},1800);
+  const oldPlace=window.placePlayer;window.placePlayer=function(){oldPlace();const now=Date.now();if(joined&&ch&&now-lastMove>240){lastMove=now;send('move',{name:state.name,x:state.pos.x,y:state.pos.y});}remotes.forEach((r,id)=>drawRemote(id,{}));};
   function requestBattle(id){if(pvp||!overlay.classList.contains('hidden'))return;const r=remotes.get(id);if(!r)return;const d=Math.hypot((r.x??50)-state.pos.x,(r.y??67)-state.pos.y);if(d>15){toast('조금 더 가까이 가서 배틀을 신청해 보세요!');return;}const bid=clientId+'_'+Date.now();open(`<div class="pvp-request"><h2>⚔️ 배틀 신청</h2><p class="speech" style="font-size:20px"><b>${safe(r.name)}</b>에게 배틀을 신청할까요?</p><div class="choices"><button class="choice" id="reqYes">신청하기</button><button class="choice" id="reqNo">취소</button></div></div>`);document.getElementById('reqNo').onclick=close;document.getElementById('reqYes').onclick=()=>{pvp={id:bid,opponent:id,waiting:true};send('battle_request',{to:id,battleId:bid,name:state.name,party:partySnapshot()});panel.innerHTML=`<div class="pvp-request"><h2>⚔️ 배틀 신청 중...</h2><p><b>${safe(r.name)}</b>의 응답을 기다리고 있습니다.</p><button class="bigbtn" id="cancelReq">취소</button></div>`;document.getElementById('cancelReq').onclick=()=>{pvp=null;close()};};}
   function onRequest(p){if(p.to!==clientId||p.from===clientId)return;if(pvp||!overlay.classList.contains('hidden')){send('battle_decline',{to:p.from,battleId:p.battleId,reason:'지금은 다른 활동 중이에요.'});return;}open(`<div class="pvp-request"><h2>⚔️ 배틀 신청!</h2><p class="speech" style="font-size:20px"><b>${safe(p.name)}</b>님이 3:3 광물몬 배틀을 신청했습니다.</p><div class="choices"><button class="choice" id="acceptPvp">수락</button><button class="choice" id="declinePvp">거절</button></div></div>`);document.getElementById('declinePvp').onclick=()=>{send('battle_decline',{to:p.from,battleId:p.battleId});close()};document.getElementById('acceptPvp').onclick=()=>{const myParty=partySnapshot();const snap=makeBattle(p.battleId,p.from,p.name,p.party,clientId,state.name,myParty,p.from);send('battle_start',{to:p.from,battle:snap});startPvp(snap);};}
   function onDecline(p){if(p.to!==clientId||!pvp||p.battleId!==pvp.id)return;pvp=null;close();toast(p.reason||'상대가 배틀 신청을 거절했습니다.');}
